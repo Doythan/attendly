@@ -372,8 +372,9 @@ async function verifyPolarWebhook(body: string, headers: Headers, secret: string
 
   const signedContent = `${msgId}.${msgTimestamp}.${body}`
 
-  // Secret is base64-encoded
-  const secretBytes = Uint8Array.from(atob(secret), c => c.charCodeAt(0))
+  // Polar secret format: "polar_whs_<base64>" — strip prefix before decoding
+  const b64 = secret.startsWith('polar_whs_') ? secret.slice('polar_whs_'.length) : secret
+  const secretBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
   const key = await crypto.subtle.importKey(
     'raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   )
