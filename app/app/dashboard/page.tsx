@@ -8,7 +8,7 @@ const FREE_LIMIT = 20
 const PRO_LIMIT = 300
 
 export default async function DashboardPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   const [{ data: profile }, { count: absentToday }, { count: unpaidCount }, { count: sentThisMonth }] =
