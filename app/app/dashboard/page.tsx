@@ -1,3 +1,5 @@
+export const runtime = 'edge'
+
 import { createClient } from '@/lib/supabase/server'
 import { Suspense } from 'react'
 import UpgradeBanner from './upgrade-banner'
