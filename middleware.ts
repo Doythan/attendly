@@ -25,7 +25,13 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    // Supabase 연결 실패 시 미인증 상태로 처리
+  }
 
   const isAppRoute = request.nextUrl.pathname.startsWith('/app')
   const isLoginRoute = request.nextUrl.pathname === '/login'

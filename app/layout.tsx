@@ -1,8 +1,7 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
+export const runtime = 'edge'
 
-const inter = Inter({ subsets: ['latin'] })
+import type { Metadata } from 'next'
+import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Attendly — 학원 출결 SMS 자동화',
@@ -12,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className={inter.className}>{children}</body>
+      <body>{children}</body>
     </html>
   )
 }
