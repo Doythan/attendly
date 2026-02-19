@@ -32,7 +32,7 @@ export default function OutboxPage() {
   function toggleSelect(id: string) {
     setSelected(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
       return next
     })
   }
@@ -133,8 +133,8 @@ export default function OutboxPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 font-medium">
-                    {(m.student as any)?.name ?? '알 수 없음'}
-                    <div className="text-xs text-gray-400">{(m.student as any)?.parent_phone}</div>
+                    {(m.student as { name?: string; parent_phone?: string } | null)?.name ?? '알 수 없음'}
+                    <div className="text-xs text-gray-400">{(m.student as { name?: string; parent_phone?: string } | null)?.parent_phone}</div>
                   </td>
                   <td className="px-4 py-3 max-w-xs">
                     <p className="text-gray-700 truncate">{m.content}</p>
