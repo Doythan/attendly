@@ -15,20 +15,35 @@
 
 ---
 
-## 현재 상태 (2026-02-19 기준)
+## 현재 상태 (2026-02-20 기준)
 
 ### ✅ 완료된 것
-- 홈(랜딩) 페이지 정상
+- 홈(랜딩) + Pricing 페이지 정상
 - `/login` 로그인/회원가입 정상 (Supabase Email Confirm **OFF** 설정됨)
 - `/app/dashboard` 정상
+- `/app/students` 학생 CRUD + 더미데이터 정상
+- `/app/attendance` 출결 저장 정상
+- `/app/billing` 미납 관리 페이지 정상
+- `/app/outbox` Outbox UI 정상
 - Supabase 스키마 적용 완료 (`supabase/schema.sql`)
-- Cloudflare Workers 배포 완료 + 시크릿 설정 완료
-- Cloudflare Pages 환경변수 설정 완료
+- profiles 트리거 정상 (신규 가입 시 profiles row 자동 생성 확인됨)
+- Workers JWT 인증 정상 (verifyToken 동작 확인)
+- OpenAI API 크레딧 충전 완료 ($5, gpt-4o-mini 사용 중)
+- Twilio Trial 계정 확인 (인증된 번호로만 발송 가능)
+- POLAR_ACCESS_TOKEN, POLAR_PRODUCT_ID workers/.dev.vars에 설정됨
 
-### 🔴 미확인 / 테스트 필요
-- AI 안내문 생성 → Outbox 저장 (Workers SUPABASE_SERVICE_ROLE_KEY 인증 확인 필요)
-- Outbox에서 SMS 전송 (Twilio 설정 확인 필요)
-- Polar 결제 → PRO 플랜 전환
+### 🔴 블로킹 이슈: OpenAI 한국 IP 차단
+- **원인**: Cloudflare Workers가 한국 PoP에서 실행 → OpenAI가 한국 IP 차단
+  - 에러: `unsupported_country_region_territory`
+- **시도한 것들 (모두 실패)**:
+  - Smart Placement (`[placement] mode = "smart"`) → Workers Free plan에서 미작동
+  - Cloudflare AI Gateway (`gateway.ai.cloudflare.com`) → 동일 문제 (Cloudflare 인프라)
+- **결정된 해결책**: **Vercel로 이전** (다음 세션에서 진행)
+
+### 🟡 미완료
+- AI 안내문 생성 (Vercel 이전 후 동작 예정)
+- SMS 전송 (Twilio verified number 등록 필요 - twilio.com/console/phone-numbers/verified)
+- Polar 결제 → PRO 플랜 전환 (POLAR_WEBHOOK_SECRET 미설정)
 
 ---
 
@@ -49,41 +64,80 @@
 - **원인**: root layout (`app/layout.tsx`)에 `export const runtime = 'edge'` 추가했다가 정적 페이지 렌더링 깨짐
 - **해결**: root layout에서 edge runtime 제거
 
+### 문제 4: OpenAI 한국 IP 차단 (미해결 → Vercel 이전으로 해결 예정)
+- **원인**: Cloudflare Workers 한국 PoP에서 OpenAI 호출 시 차단
+- **해결책**: Vercel API Routes (`preferredRegion = 'iad1'`) 사용
+
 ---
 
-## 아키텍처 요약
+## 다음 세션에서 해야 할 것 (우선순위 순)
 
+### 1순위: Vercel 이전 (블로킹 이슈 해결)
+Workers API 5개를 Next.js API Routes로 전환 후 Vercel 배포:
+```
+workers/api/generate-message  →  app/api/generate-message/route.ts
+workers/api/send-sms          →  app/api/send-sms/route.ts
+workers/api/send-sms-bulk     →  app/api/send-sms-bulk/route.ts
+workers/api/polar/create-checkout  →  app/api/polar/create-checkout/route.ts
+workers/api/polar/webhook     →  app/api/polar/webhook/route.ts
+```
+- 각 route에 `export const preferredRegion = 'iad1'` 추가
+- `NEXT_PUBLIC_WORKERS_URL` 환경변수 제거 → `/api/...` 직접 호출로 변경
+- Vercel 환경변수 설정 (현재 Workers 시크릿과 동일)
+- next-on-pages 제거, Cloudflare Pages → Vercel로 변경
+
+### 2순위: SMS 전송 테스트
+- Twilio 대시보드에서 본인 번호 verified number 등록
+- 학생 parent_phone을 그 번호로 설정 후 전송 테스트
+
+### 3순위: Polar 결제
+- POLAR_WEBHOOK_SECRET 설정 (Polar 대시보드에서 webhook 등록 후 발급)
+- 결제 → PRO 전환 테스트
+
+---
+
+## 아키텍처 (현재 → 목표)
+
+### 현재
 ```
 브라우저
-  │
   ├── Cloudflare Pages (attendly-1lg.pages.dev)
-  │     Next.js 15 App Router + next-on-pages
-  │     ├── / (static)
-  │     ├── /login (static, 'use client')
-  │     └── /app/* (edge functions, runtime = 'edge')
-  │           └── /app/layout.tsx ← Supabase auth 체크 (try-catch)
+  │     Next.js App Router + next-on-pages
   │
   └── Cloudflare Workers (attendly-workers.won03289.workers.dev)
-        비밀키 사용 API:
-        POST /api/generate-message  (OpenAI)
-        POST /api/send-sms          (Twilio)
-        POST /api/send-sms-bulk     (Twilio)
-        POST /api/polar/create-checkout (Polar)
-        POST /api/polar/webhook     (Polar → DB plan 업데이트)
+        POST /api/generate-message  ← 한국 IP 차단으로 동작 안 함
+        POST /api/send-sms
+        POST /api/send-sms-bulk
+        POST /api/polar/create-checkout
+        POST /api/polar/webhook
+```
+
+### 목표 (Vercel 이전 후)
+```
+브라우저
+  └── Vercel (새 URL)
+        Next.js App Router
+        ├── 프론트엔드 페이지 (기존과 동일)
+        └── API Routes (preferredRegion = 'iad1', 미국 서버)
+              POST /api/generate-message
+              POST /api/send-sms
+              POST /api/send-sms-bulk
+              POST /api/polar/create-checkout
+              POST /api/polar/webhook
 ```
 
 ---
 
 ## 환경변수 현황
 
-### Cloudflare Pages 대시보드 (빌드 + 런타임)
+### Cloudflare Pages (현재)
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://yuzygpommgawbmdrzsxn.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_Z9peJ2CystiLxoLAa5dpLw_bwD90etn
 NEXT_PUBLIC_WORKERS_URL=https://attendly-workers.won03289.workers.dev
 ```
 
-### Cloudflare Workers 시크릿 (대시보드에서 설정됨)
+### Cloudflare Workers 시크릿 (설정됨)
 ```
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
@@ -92,12 +146,38 @@ TWILIO_ACCOUNT_SID
 TWILIO_AUTH_TOKEN
 TWILIO_FROM_NUMBER
 APP_BASE_URL=https://attendly-1lg.pages.dev
+POLAR_ACCESS_TOKEN
+POLAR_PRODUCT_ID
 ```
-> POLAR_ACCESS_TOKEN, POLAR_PRODUCT_ID, POLAR_WEBHOOK_SECRET 도 필요
+> POLAR_WEBHOOK_SECRET 미설정
 
-### wrangler.toml (workers/)
-```toml
-OPENAI_MODEL = "gpt-4o-mini"  # [vars]로 설정됨
+### workers/.dev.vars (로컬, 실제 값 있음)
+- SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY
+- OPENAI_MODEL=gpt-4o-mini
+- TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER=+18454724310
+- POLAR_ACCESS_TOKEN, POLAR_PRODUCT_ID 있음
+- POLAR_WEBHOOK_SECRET 비어있음
+- APP_BASE_URL=http://localhost:3000
+
+### Vercel 이전 시 설정할 환경변수
+```
+# Public (빌드 시 번들에 포함)
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+# NEXT_PUBLIC_WORKERS_URL 불필요 (API Routes 직접 호출)
+
+# Server-only (API Routes에서 사용)
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+OPENAI_API_KEY
+OPENAI_MODEL=gpt-4o-mini
+TWILIO_ACCOUNT_SID
+TWILIO_AUTH_TOKEN
+TWILIO_FROM_NUMBER
+POLAR_ACCESS_TOKEN
+POLAR_PRODUCT_ID
+POLAR_WEBHOOK_SECRET
+APP_BASE_URL (Vercel 배포 URL)
 ```
 
 ---
@@ -115,18 +195,10 @@ OPENAI_MODEL = "gpt-4o-mini"  # [vars]로 설정됨
 | `middleware.ts` | no-op (Supabase 제거됨, /app/* 매칭만) |
 | `lib/supabase/server.ts` | 서버 Supabase 클라이언트 |
 | `lib/supabase/client.ts` | 브라우저 Supabase 클라이언트 |
-| `workers/src/index.ts` | Workers 전체 API |
+| `workers/src/index.ts` | Workers 전체 API (Vercel 이전 후 불필요) |
 | `supabase/schema.sql` | DB 스키마 (이미 적용됨) |
-| `wrangler.toml` | Pages 설정 (compatibility_date: 2025-01-01) |
-| `workers/wrangler.toml` | Workers 설정 |
-
----
-
-## 다음 세션에서 해야 할 것
-
-1. **AI 생성 테스트**: 학생 등록 → 출결에서 결석 체크 → AI 안내문 생성 → Outbox 확인
-2. **SMS 전송 테스트**: Outbox에서 메시지 선택 → 전송 → 실제 폰 수신 확인
-3. **Polar 결제 테스트**: PRO 업그레이드 플로우
+| `wrangler.toml` | Pages 설정 (Vercel 이전 후 불필요) |
+| `workers/wrangler.toml` | Workers 설정 (Vercel 이전 후 불필요) |
 
 ---
 
@@ -137,12 +209,9 @@ OPENAI_MODEL = "gpt-4o-mini"  # [vars]로 설정됨
 npm install
 npm run dev  # localhost:3000
 
-# Workers
+# Workers (현재)
 cd workers
 npm install
-# workers/.dev.vars 파일 생성 후 시크릿 값 입력
+# workers/.dev.vars 파일에 시크릿 값 있음
 npm run dev  # localhost:8787
-
-# Cloudflare Pages 빌드 (배포 전 확인용)
-npm run pages:build
 ```
