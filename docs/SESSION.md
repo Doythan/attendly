@@ -8,8 +8,9 @@
 
 | 서비스 | URL |
 |---|---|
-| **프론트 (Cloudflare Pages)** | https://attendly-1lg.pages.dev |
-| **Workers API** | https://attendly-workers.won03289.workers.dev |
+| **프론트 (Vercel)** | https://attendly-mu.vercel.app |
+| ~~Cloudflare Pages~~ | ~~https://attendly-1lg.pages.dev~~ (사용 안 함) |
+| ~~Workers API~~ | ~~https://attendly-workers.won03289.workers.dev~~ (사용 안 함) |
 | **GitHub** | https://github.com/Doythan/attendly |
 | **Supabase** | https://yuzygpommgawbmdrzsxn.supabase.co |
 
@@ -40,10 +41,13 @@
   - `.env.local`: 모든 서버 키 통합 완료
   - 로컬 빌드 성공 확인 (`npm run build` ✅)
 
+- **✅ Vercel 배포 완료**: https://attendly-mu.vercel.app (미국 iad1 서버)
+- Next.js 15.5.12으로 업데이트 (CVE-2025-66478 패치)
+
 ### 🟡 미완료 (다음 세션)
-- **Vercel 배포**: `vercel --prod` 실행 + 환경변수 설정 필요 (아래 참고)
 - SMS 전송 테스트 (Twilio verified number 등록 필요)
 - Polar 결제 → PRO 플랜 전환 (POLAR_WEBHOOK_SECRET 미설정)
+- AI 안내문 생성 동작 테스트 확인 필요
 
 ---
 
@@ -72,21 +76,7 @@
 
 ## 다음 세션에서 해야 할 것 (우선순위 순)
 
-### 1순위: Vercel 배포 (코드 이전 완료, 배포만 남음)
-```bash
-# vercel CLI 설치 후 실행
-npm i -g vercel
-vercel --prod
-```
-Vercel 환경변수 설정 (`.env.local` 내용 그대로):
-- NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
-- SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-- OPENAI_API_KEY, OPENAI_MODEL=gpt-4o-mini
-- TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
-- POLAR_ACCESS_TOKEN, POLAR_PRODUCT_ID, POLAR_WEBHOOK_SECRET
-- APP_BASE_URL (Vercel 배포 후 발급되는 URL)
-
-### 2순위: SMS 전송 테스트
+### 1순위: SMS 전송 테스트
 - Twilio 대시보드에서 본인 번호 verified number 등록
 - 학생 parent_phone을 그 번호로 설정 후 전송 테스트
 
