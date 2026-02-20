@@ -27,8 +27,8 @@ export async function POST(req: NextRequest) {
       Authorization: `Bearer ${process.env.POLAR_ACCESS_TOKEN}`,
     },
     body: JSON.stringify({
-      products: [process.env.POLAR_PRODUCT_ID],
-      success_url: `${process.env.APP_BASE_URL}/app/dashboard?upgraded=true`,
+      products: [(process.env.POLAR_PRODUCT_ID ?? '').trim()],
+      success_url: `${(process.env.APP_BASE_URL ?? '').trim()}/app/dashboard?upgraded=true`,
       metadata: { owner_id: ownerId },
     }),
   })
