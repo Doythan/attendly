@@ -62,11 +62,13 @@ export default function StudentsPage() {
     e.preventDefault()
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('students').insert({
+    if (!user) { alert('로그인이 필요합니다. 페이지를 새로고침 해주세요.'); setSaving(false); return }
+    const { error } = await supabase.from('students').insert({
       ...form,
       monthly_fee: form.monthly_fee ? parseInt(form.monthly_fee) : 0,
-      owner_id: user!.id,
+      owner_id: user.id,
     })
+    if (error) { alert('저장 실패: ' + error.message); setSaving(false); return }
     setForm({ name: '', parent_phone: '', class_name: '', memo: '', is_unpaid: false, monthly_fee: '' })
     setShowForm(false)
     setSaving(false)
