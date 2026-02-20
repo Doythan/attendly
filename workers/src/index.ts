@@ -166,7 +166,7 @@ async function handleGenerateMessage(req: Request, env: Env, ownerId: string): P
     prompt = `학원 학부모에게 보내는 미납 안내 문자를 작성해줘. 학생 이름: ${studentName}. 어조: ${tone === 'FRIENDLY' ? '친근하게' : tone === 'FORMAL' ? '공식적으로' : '단호하게'}. 120자 이내의 자연스러운 한국어 문자 본문만 출력해. JSON이나 설명 없이 문자 텍스트만.`
   }
 
-  const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+  const openaiRes = await fetch('https://gateway.ai.cloudflare.com/v1/24076c38e765166912a6c4f5e1f5b63b/attendly/compat/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
