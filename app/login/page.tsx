@@ -73,17 +73,6 @@ export default function LoginPage() {
             </svg>
             Google로 계속하기
           </button>
-          <button
-            type="button"
-            onClick={() => handleOAuth('kakao')}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 rounded-lg py-2.5 text-sm font-medium text-[#3C1E1E] bg-[#FEE500] hover:bg-[#F5DC00] transition disabled:opacity-50"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#3C1E1E">
-              <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.7 1.663 5.07 4.2 6.48l-.9 3.36c-.08.3.26.54.52.36L9.96 18.6c.66.1 1.34.16 2.04.16 5.523 0 10-3.477 10-7.76C22 6.477 17.523 3 12 3z"/>
-            </svg>
-            카카오로 계속하기
-          </button>
         </div>
 
         <div className="relative mb-6">
