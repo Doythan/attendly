@@ -254,7 +254,7 @@ export default function BillingPage() {
 
           <button onClick={handleGenerate} disabled={generating || unpaid.length === 0}
             className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50">
-            {generating ? 'AI 생성 중...' : `✨ 미납 리마인드 템플릿 생성 (API 1회)`}
+            {generating ? 'AI 생성 중...' : `✨ AI 미납 리마인드 템플릿 생성`}
           </button>
         </div>
 
