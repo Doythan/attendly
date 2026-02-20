@@ -9,6 +9,7 @@ const navItems = [
   { href: '/app/students',   label: '학생 관리' },
   { href: '/app/attendance', label: '출결 관리' },
   { href: '/app/billing',    label: '미납 관리' },
+  { href: '/app/notice',     label: '전체 공지' },
   { href: '/app/outbox',     label: 'Outbox' },
 ]
 
@@ -43,12 +44,24 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
-      <button
-        onClick={handleSignOut}
-        className="text-xs text-gray-400 hover:text-gray-700 mt-4 text-left px-3"
-      >
-        로그아웃
-      </button>
+      <div className="border-t pt-3 mt-2">
+        <Link
+          href="/app/settings"
+          className={`block px-3 py-2 rounded-lg text-sm font-medium transition mb-1 ${
+            pathname.startsWith('/app/settings')
+              ? 'bg-indigo-50 text-indigo-700'
+              : 'text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          설정
+        </Link>
+        <button
+          onClick={handleSignOut}
+          className="text-xs text-gray-400 hover:text-gray-700 px-3"
+        >
+          로그아웃
+        </button>
+      </div>
     </aside>
   )
 }

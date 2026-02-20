@@ -1,12 +1,13 @@
 export type Plan = 'FREE' | 'PRO'
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE'
-export type MessageType = 'ATTENDANCE' | 'PAYMENT'
+export type MessageType = 'ATTENDANCE' | 'PAYMENT' | 'NOTICE'
 export type MessageTone = 'FRIENDLY' | 'FORMAL' | 'FIRM'
 export type MessageStatus = 'DRAFT' | 'SENT' | 'FAILED'
 
 export interface Profile {
   id: string
   plan: Plan
+  academy_name: string
   sms_sent_count: number
   sms_sent_count_month: string
   created_at: string
@@ -21,6 +22,7 @@ export interface Student {
   class_name: string
   memo: string
   is_unpaid: boolean
+  unpaid_months: number
   created_at: string
   updated_at: string
 }
