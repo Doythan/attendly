@@ -20,15 +20,34 @@ function checkRateLimit(userId: string): boolean {
   return true
 }
 
-function normalizePhone(phone: string): string {
+// Solapi는 한국 포맷(010XXXXXXXX)으로 전송
+function normalizePhoneForSolapi(phone: string): string {
   const digits = phone.replace(/\D/g, '')
-  if (digits.startsWith('010')) return '+82' + digits.slice(1)
-  if (digits.startsWith('82')) return '+' + digits
-  return '+' + digits
+  if (digits.startsWith('82')) return '0' + digits.slice(2)
+  return digits
 }
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
+}
+
+async function getSolapiAuthHeader(): Promise<string> {
+  const apiKey = process.env.SOLAPI_API_KEY!
+  const apiSecret = process.env.SOLAPI_API_SECRET!
+  const date = new Date().toISOString()
+  const salt = crypto.randomUUID()
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(apiSecret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(date + salt))
+  const signature = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+  return `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`
 }
 
 async function verifyToken(authHeader: string | null): Promise<string | null> {
@@ -107,37 +126,38 @@ export async function POST(req: NextRequest) {
   const quotaErr = await consumeSmsQuota(supabase, ownerId)
   if (quotaErr) return NextResponse.json({ error: quotaErr }, { status: 402 })
 
-  const toNumber = normalizePhone(student.parent_phone)
-  const twilioRes = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64')}`,
+  const toNumber = normalizePhoneForSolapi(student.parent_phone)
+  const solapiRes = await fetch('https://api.solapi.com/messages/v4/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: await getSolapiAuthHeader(),
+    },
+    body: JSON.stringify({
+      message: {
+        to: toNumber,
+        from: process.env.SOLAPI_SENDER_NUMBER,
+        text: message.content,
+        type: 'LMS',
       },
-      body: new URLSearchParams({
-        From: process.env.TWILIO_FROM_NUMBER!,
-        To: toNumber,
-        Body: message.content,
-      }),
-    }
-  )
+    }),
+  })
 
-  const twilioData = await twilioRes.json() as { sid?: string; message?: string }
+  const solapiData = await solapiRes.json() as { messageId?: string; errorCode?: string; errorMessage?: string }
 
-  if (!twilioRes.ok || !twilioData.sid) {
+  if (!solapiRes.ok || !solapiData.messageId) {
+    const errMsg = solapiData.errorMessage ?? 'Solapi error'
     await supabase
       .from('messages')
-      .update({ status: 'FAILED', error: twilioData.message ?? 'Twilio error' })
+      .update({ status: 'FAILED', error: errMsg })
       .eq('id', messageId)
-    return NextResponse.json({ error: twilioData.message ?? 'Twilio error' }, { status: 502 })
+    return NextResponse.json({ error: errMsg }, { status: 502 })
   }
 
   await supabase
     .from('messages')
-    .update({ status: 'SENT', provider_message_id: twilioData.sid, error: null })
+    .update({ status: 'SENT', provider_message_id: solapiData.messageId, error: null })
     .eq('id', messageId)
 
-  return NextResponse.json({ sid: twilioData.sid })
+  return NextResponse.json({ messageId: solapiData.messageId })
 }
