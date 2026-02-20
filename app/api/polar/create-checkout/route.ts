@@ -33,9 +33,13 @@ export async function POST(req: NextRequest) {
     }),
   })
 
-  const session = await polarRes.json() as { url?: string; detail?: string }
+  const session = await polarRes.json() as { url?: string; detail?: unknown }
   if (!polarRes.ok || !session.url) {
-    return NextResponse.json({ error: session.detail ?? 'Polar checkout error' }, { status: 502 })
+    const errDetail = typeof session.detail === 'string'
+      ? session.detail
+      : JSON.stringify(session.detail)
+    console.error('[Polar checkout error]', polarRes.status, errDetail)
+    return NextResponse.json({ error: errDetail ?? 'Polar checkout error', status: polarRes.status }, { status: 502 })
   }
 
   return NextResponse.json({ url: session.url })
