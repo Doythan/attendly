@@ -4,6 +4,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Attendly — 학원 출결 SMS 자동화',
   description: '출결 관리부터 학부모 SMS까지 한 번에',
+  icons: { icon: '/icon.png' },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

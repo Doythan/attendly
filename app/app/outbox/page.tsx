@@ -10,11 +10,6 @@ const STATUS_COLOR: Record<MessageStatus, string> = {
   FAILED: 'bg-red-100 text-red-700',
 }
 
-type PreviewModal = {
-  message: Message
-  editContent: string
-}
-
 export default function OutboxPage() {
   const supabase = createClient()
   const [messages, setMessages] = useState<Message[]>([])
@@ -22,7 +17,11 @@ export default function OutboxPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState<{ type: 'single' | 'bulk'; ids: string[] } | null>(null)
-  const [previewModal, setPreviewModal] = useState<PreviewModal | null>(null)
+
+  // 미리보기/수정 모달 상태
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewMessage, setPreviewMessage] = useState<Message | null>(null)
+  const [editContent, setEditContent] = useState('')
   const [saving, setSaving] = useState(false)
 
   const fetchMessages = useCallback(async () => {
@@ -35,6 +34,18 @@ export default function OutboxPage() {
   }, [supabase])
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
+
+  function openPreview(m: Message) {
+    setPreviewMessage(m)
+    setEditContent(m.content)
+    setPreviewOpen(true)
+  }
+
+  function closePreview() {
+    setPreviewOpen(false)
+    setPreviewMessage(null)
+    setEditContent('')
+  }
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -60,8 +71,7 @@ export default function OutboxPage() {
   }
 
   async function deleteSelected() {
-    const ids = Array.from(selected)
-    await supabase.from('messages').delete().in('id', ids)
+    await supabase.from('messages').delete().in('id', Array.from(selected))
     setSelected(new Set())
     fetchMessages()
   }
@@ -72,14 +82,11 @@ export default function OutboxPage() {
   }
 
   async function saveEdit() {
-    if (!previewModal) return
+    if (!previewMessage) return
     setSaving(true)
-    await supabase
-      .from('messages')
-      .update({ content: previewModal.editContent })
-      .eq('id', previewModal.message.id)
+    await supabase.from('messages').update({ content: editContent }).eq('id', previewMessage.id)
     setSaving(false)
-    setPreviewModal(null)
+    closePreview()
     fetchMessages()
   }
 
@@ -109,8 +116,17 @@ export default function OutboxPage() {
     fetchMessages()
   }
 
+  function sendFromPreview() {
+    if (!previewMessage) return
+    const id = previewMessage.id
+    closePreview()
+    setConfirmModal({ type: 'single', ids: [id] })
+  }
+
   const draftIds = messages.filter(m => m.status === 'DRAFT').map(m => m.id)
   const selectedDrafts = Array.from(selected).filter(id => draftIds.includes(id))
+
+  const isDraft = previewMessage?.status === 'DRAFT'
 
   return (
     <div>
@@ -134,10 +150,7 @@ export default function OutboxPage() {
               {sending === 'bulk' ? '전송 중...' : `선택 전송 (${selectedDrafts.length}건)`}
             </button>
           )}
-          <button
-            onClick={fetchMessages}
-            className="border rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-          >
+          <button onClick={fetchMessages} className="border rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
             새로고침
           </button>
         </div>
@@ -169,11 +182,7 @@ export default function OutboxPage() {
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     {m.status !== 'SENT' && (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(m.id)}
-                        onChange={() => toggleSelect(m.id)}
-                      />
+                      <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggleSelect(m.id)} />
                     )}
                   </td>
                   <td className="px-4 py-3 font-medium">
@@ -181,12 +190,11 @@ export default function OutboxPage() {
                     <div className="text-xs text-gray-400">{(m.student as { name?: string; parent_phone?: string } | null)?.parent_phone}</div>
                   </td>
                   <td className="px-4 py-3 max-w-xs">
-                    <button
-                      onClick={() => setPreviewModal({ message: m, editContent: m.content })}
-                      className="text-left w-full group"
-                    >
+                    <button onClick={() => openPreview(m)} className="text-left w-full group">
                       <p className="text-gray-700 truncate group-hover:text-indigo-600 transition-colors">{m.content}</p>
-                      <p className="text-xs text-gray-400 group-hover:text-indigo-400">클릭하여 전체보기{m.status === 'DRAFT' ? ' · 수정' : ''}</p>
+                      <p className="text-xs text-indigo-400 mt-0.5">
+                        {m.status === 'DRAFT' ? '전체보기 · 수정 가능' : '전체보기'}
+                      </p>
                     </button>
                     {m.error && <p className="text-red-500 text-xs truncate mt-1">{m.error}</p>}
                   </td>
@@ -210,18 +218,12 @@ export default function OutboxPage() {
                         </button>
                       )}
                       {m.status === 'FAILED' && (
-                        <button
-                          onClick={() => resetFailed(m.id)}
-                          className="text-xs bg-yellow-50 text-yellow-700 px-3 py-1 rounded-lg hover:bg-yellow-100"
-                        >
+                        <button onClick={() => resetFailed(m.id)} className="text-xs bg-yellow-50 text-yellow-700 px-3 py-1 rounded-lg hover:bg-yellow-100">
                           재시도
                         </button>
                       )}
                       {m.status !== 'SENT' && (
-                        <button
-                          onClick={() => deleteMessage(m.id)}
-                          className="text-xs bg-red-50 text-red-500 px-3 py-1 rounded-lg hover:bg-red-100"
-                        >
+                        <button onClick={() => deleteMessage(m.id)} className="text-xs bg-red-50 text-red-500 px-3 py-1 rounded-lg hover:bg-red-100">
                           삭제
                         </button>
                       )}
@@ -237,69 +239,67 @@ export default function OutboxPage() {
         </div>
       )}
 
-      {/* 내용 미리보기 / 수정 모달 */}
-      {previewModal && (
+      {/* 미리보기 / 수정 모달 */}
+      {previewOpen && previewMessage && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl flex flex-col">
+            {/* 헤더 */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b">
               <div>
-                <h2 className="text-lg font-bold">메시지 내용</h2>
+                <h2 className="text-lg font-bold">
+                  {isDraft ? '내용 수정' : '내용 보기'}
+                </h2>
                 <p className="text-sm text-gray-400 mt-0.5">
-                  {(previewModal.message.student as { name?: string } | null)?.name} ·{' '}
-                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${STATUS_COLOR[previewModal.message.status]}`}>
-                    {previewModal.message.status}
+                  {(previewMessage.student as { name?: string } | null)?.name ?? '알 수 없음'} ·{' '}
+                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${STATUS_COLOR[previewMessage.status]}`}>
+                    {previewMessage.status}
                   </span>
                 </p>
               </div>
-              <button onClick={() => setPreviewModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-light">✕</button>
+              <button onClick={closePreview} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
 
-            <div className="px-6 py-4">
-              {previewModal.message.status === 'DRAFT' ? (
-                <>
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">내용 수정</label>
-                  <textarea
-                    value={previewModal.editContent}
-                    onChange={e => setPreviewModal({ ...previewModal, editContent: e.target.value })}
-                    rows={6}
-                    className="mt-2 w-full border rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  />
-                  <p className="text-xs text-gray-400 mt-1 text-right">{previewModal.editContent.length}자</p>
-                </>
+            {/* 본문 */}
+            <div className="px-6 py-4 flex-1">
+              {isDraft ? (
+                <textarea
+                  value={editContent}
+                  onChange={e => setEditContent(e.target.value)}
+                  rows={7}
+                  className="w-full border rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 leading-relaxed"
+                  placeholder="메시지 내용을 입력하세요"
+                />
               ) : (
-                <>
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">내용</label>
-                  <div className="mt-2 w-full border rounded-xl px-4 py-3 text-sm text-gray-700 bg-gray-50 whitespace-pre-wrap leading-relaxed">
-                    {previewModal.message.content}
-                  </div>
-                </>
+                <div className="w-full border rounded-xl px-4 py-3 text-sm text-gray-700 bg-gray-50 whitespace-pre-wrap leading-relaxed min-h-[10rem]">
+                  {previewMessage.content}
+                </div>
               )}
-
-              {previewModal.message.error && (
-                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
-                  <p className="text-xs text-red-600">{previewModal.message.error}</p>
+              {isDraft && (
+                <p className="text-xs text-gray-400 mt-1 text-right">{editContent.length}자</p>
+              )}
+              {previewMessage.error && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <p className="text-xs text-red-600">{previewMessage.error}</p>
                 </div>
               )}
             </div>
 
-            <div className="flex gap-3 justify-end px-6 pb-6">
-              <button onClick={() => setPreviewModal(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+            {/* 푸터 버튼 */}
+            <div className="flex gap-2 justify-end px-6 pb-5">
+              <button onClick={closePreview} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border rounded-lg">
                 닫기
               </button>
-              {previewModal.message.status === 'DRAFT' && (
+              {isDraft && (
                 <>
                   <button
                     onClick={saveEdit}
-                    disabled={saving || previewModal.editContent === previewModal.message.content}
-                    className="px-5 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-40 font-medium"
+                    disabled={saving}
+                    className="px-5 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-50 font-medium"
                   >
                     {saving ? '저장 중...' : '저장'}
                   </button>
                   <button
-                    onClick={() => {
-                      setPreviewModal(null)
-                      setConfirmModal({ type: 'single', ids: [previewModal.message.id] })
-                    }}
+                    onClick={sendFromPreview}
                     disabled={!!sending}
                     className="px-5 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
                   >
@@ -323,13 +323,8 @@ export default function OutboxPage() {
                 : '1건을 전송합니다. 실제 SMS가 발송됩니다.'}
             </p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setConfirmModal(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
-                취소
-              </button>
-              <button
-                onClick={() => sendMessages(confirmModal.ids)}
-                className="px-5 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
-              >
+              <button onClick={() => setConfirmModal(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">취소</button>
+              <button onClick={() => sendMessages(confirmModal.ids)} className="px-5 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
                 전송하기
               </button>
             </div>
