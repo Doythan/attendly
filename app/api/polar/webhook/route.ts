@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
   const shouldUpgrade =
     proEvents.includes(event.type) &&
-    (event.type !== 'checkout.updated' || event.data.status === 'succeeded')
+    (event.type !== 'checkout.updated' || ['succeeded', 'confirmed'].includes(event.data.status ?? ''))
 
   if (shouldUpgrade && ownerId) {
     const supabase = createClient(
