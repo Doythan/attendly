@@ -33,8 +33,8 @@ function currentMonth(): string {
 }
 
 function getSolapiAuthHeader(): string {
-  const apiKey = process.env.SOLAPI_API_KEY!
-  const apiSecret = process.env.SOLAPI_API_SECRET!
+  const apiKey = (process.env.SOLAPI_API_KEY ?? '').trim()
+  const apiSecret = (process.env.SOLAPI_API_SECRET ?? '').trim()
   const date = new Date().toISOString()
   const salt = randomUUID()
   const signature = createHmac('sha256', apiSecret).update(date + salt).digest('hex')
