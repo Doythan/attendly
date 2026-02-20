@@ -137,9 +137,10 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         message: {
           to: toNumber,
-          from: process.env.SOLAPI_SENDER_NUMBER,
+          from: (process.env.SOLAPI_SENDER_NUMBER ?? '').trim(),
           text: message.content,
           type: 'LMS',
+          subject: '학원 안내',
         },
       }),
     })
