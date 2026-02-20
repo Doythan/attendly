@@ -27,22 +27,22 @@
 - `/app/outbox` Outbox UI 정상
 - Supabase 스키마 적용 완료 (`supabase/schema.sql`)
 - profiles 트리거 정상 (신규 가입 시 profiles row 자동 생성 확인됨)
-- Workers JWT 인증 정상 (verifyToken 동작 확인)
 - OpenAI API 크레딧 충전 완료 ($5, gpt-4o-mini 사용 중)
 - Twilio Trial 계정 확인 (인증된 번호로만 발송 가능)
-- POLAR_ACCESS_TOKEN, POLAR_PRODUCT_ID workers/.dev.vars에 설정됨
+- **✅ Vercel 이전 완료** (Workers → Next.js API Routes, `preferredRegion = 'iad1'`)
+  - `app/api/generate-message/route.ts`
+  - `app/api/send-sms/route.ts`
+  - `app/api/send-sms-bulk/route.ts`
+  - `app/api/polar/create-checkout/route.ts`
+  - `app/api/polar/webhook/route.ts`
+  - 프론트엔드: `NEXT_PUBLIC_WORKERS_URL` 제거, `/api/...` 직접 호출로 변경
+  - `next.config.mjs`: Cloudflare setup 제거
+  - `.env.local`: 모든 서버 키 통합 완료
+  - 로컬 빌드 성공 확인 (`npm run build` ✅)
 
-### 🔴 블로킹 이슈: OpenAI 한국 IP 차단
-- **원인**: Cloudflare Workers가 한국 PoP에서 실행 → OpenAI가 한국 IP 차단
-  - 에러: `unsupported_country_region_territory`
-- **시도한 것들 (모두 실패)**:
-  - Smart Placement (`[placement] mode = "smart"`) → Workers Free plan에서 미작동
-  - Cloudflare AI Gateway (`gateway.ai.cloudflare.com`) → 동일 문제 (Cloudflare 인프라)
-- **결정된 해결책**: **Vercel로 이전** (다음 세션에서 진행)
-
-### 🟡 미완료
-- AI 안내문 생성 (Vercel 이전 후 동작 예정)
-- SMS 전송 (Twilio verified number 등록 필요 - twilio.com/console/phone-numbers/verified)
+### 🟡 미완료 (다음 세션)
+- **Vercel 배포**: `vercel --prod` 실행 + 환경변수 설정 필요 (아래 참고)
+- SMS 전송 테스트 (Twilio verified number 등록 필요)
 - Polar 결제 → PRO 플랜 전환 (POLAR_WEBHOOK_SECRET 미설정)
 
 ---
@@ -72,19 +72,19 @@
 
 ## 다음 세션에서 해야 할 것 (우선순위 순)
 
-### 1순위: Vercel 이전 (블로킹 이슈 해결)
-Workers API 5개를 Next.js API Routes로 전환 후 Vercel 배포:
+### 1순위: Vercel 배포 (코드 이전 완료, 배포만 남음)
+```bash
+# vercel CLI 설치 후 실행
+npm i -g vercel
+vercel --prod
 ```
-workers/api/generate-message  →  app/api/generate-message/route.ts
-workers/api/send-sms          →  app/api/send-sms/route.ts
-workers/api/send-sms-bulk     →  app/api/send-sms-bulk/route.ts
-workers/api/polar/create-checkout  →  app/api/polar/create-checkout/route.ts
-workers/api/polar/webhook     →  app/api/polar/webhook/route.ts
-```
-- 각 route에 `export const preferredRegion = 'iad1'` 추가
-- `NEXT_PUBLIC_WORKERS_URL` 환경변수 제거 → `/api/...` 직접 호출로 변경
-- Vercel 환경변수 설정 (현재 Workers 시크릿과 동일)
-- next-on-pages 제거, Cloudflare Pages → Vercel로 변경
+Vercel 환경변수 설정 (`.env.local` 내용 그대로):
+- NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+- SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+- OPENAI_API_KEY, OPENAI_MODEL=gpt-4o-mini
+- TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
+- POLAR_ACCESS_TOKEN, POLAR_PRODUCT_ID, POLAR_WEBHOOK_SECRET
+- APP_BASE_URL (Vercel 배포 후 발급되는 URL)
 
 ### 2순위: SMS 전송 테스트
 - Twilio 대시보드에서 본인 번호 verified number 등록

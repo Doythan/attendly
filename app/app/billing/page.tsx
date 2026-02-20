@@ -29,11 +29,10 @@ export default function BillingPage() {
     if (unpaid.length === 0) { alert('미납 학생이 없습니다.'); return }
     setGenerating(true)
     setGenResult('')
-    const workersUrl = process.env.NEXT_PUBLIC_WORKERS_URL
     const { data: { session } } = await supabase.auth.getSession()
     let saved = 0
     for (const student of unpaid) {
-      const res = await fetch(`${workersUrl}/api/generate-message`, {
+      const res = await fetch('/api/generate-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
         body: JSON.stringify({ studentName: student.name, type: 'PAYMENT', tone, studentId: student.id }),
@@ -46,9 +45,8 @@ export default function BillingPage() {
 
   async function handleCheckout() {
     setCheckoutLoading(true)
-    const workersUrl = process.env.NEXT_PUBLIC_WORKERS_URL
     const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(`${workersUrl}/api/polar/create-checkout`, {
+    const res = await fetch('/api/polar/create-checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
     })

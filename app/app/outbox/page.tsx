@@ -47,13 +47,12 @@ export default function OutboxPage() {
   }
 
   async function sendMessages(ids: string[]) {
-    const workersUrl = process.env.NEXT_PUBLIC_WORKERS_URL
     const { data: { session } } = await supabase.auth.getSession()
     setConfirmModal(null)
 
     if (ids.length === 1) {
       setSending(ids[0])
-      await fetch(`${workersUrl}/api/send-sms`, {
+      await fetch('/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
         body: JSON.stringify({ messageId: ids[0] }),
@@ -61,7 +60,7 @@ export default function OutboxPage() {
       setSending(null)
     } else {
       setSending('bulk')
-      await fetch(`${workersUrl}/api/send-sms-bulk`, {
+      await fetch('/api/send-sms-bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
         body: JSON.stringify({ messageIds: ids }),

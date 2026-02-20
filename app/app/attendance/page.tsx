@@ -74,12 +74,11 @@ export default function AttendancePage() {
     setGenerating(true)
     setGenResult('')
 
-    const workersUrl = process.env.NEXT_PUBLIC_WORKERS_URL
     const { data: { session } } = await supabase.auth.getSession()
 
     let saved = 0
     for (const student of absentStudents) {
-      const res = await fetch(`${workersUrl}/api/generate-message`, {
+      const res = await fetch('/api/generate-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
