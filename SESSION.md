@@ -26,6 +26,7 @@
 - OpenAI AI 안내문 생성 정상 동작 확인
 - favicon: `app/icon.png` 사용 중 (favicon.ico 제거됨)
 - 모든 DB 마이그레이션 적용 완료
+- **Google 소셜 로그인** 추가 (`/login` → OAuth → `/auth/callback` → 대시보드)
 
 ### 페이지별 기능 요약
 
@@ -96,7 +97,13 @@ APP_BASE_URL=https://attendly-mu.vercel.app
 | 우선순위 | 항목 |
 |---|---|
 | 🟡 | Polar 결제 → PRO 전환: `POLAR_WEBHOOK_SECRET` Vercel 미설정, Polar 대시보드에 webhook URL 미등록 |
-| 🟡 | 시연 영상 촬영 (체크리스트: README.md 참고) |
+| 🟡 | 시연 영상 촬영 (체크리스트: DEMO.md 참고) |
+
+## 시연 관련
+- 시연 스크립트 + 발표 자료: `DEMO.md` (새로 생성됨)
+- Polar: 현재 **Sandbox 모드**, 테스트 카드 4242 4242 4242 4242 사용
+- SMS: Solapi (해커톤 후 더 저렴한 곳으로 교체 예정)
+- 랜딩 페이지 "Twilio" 문구 → "Solapi"로 수정 완료
 
 ---
 

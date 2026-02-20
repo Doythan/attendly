@@ -18,7 +18,7 @@ export default function LandingPage() {
         </h1>
         <p className="text-lg text-gray-500 mb-8">
           결석·미납 학생을 클릭 한 번으로 파악하고, AI가 안내문을 써주고,
-          <br />Twilio로 실제 문자가 날아갑니다.
+          <br />Solapi로 실제 문자가 날아갑니다.
         </p>
         <Link
           href="/login"
