@@ -40,18 +40,42 @@ export async function POST(req: NextRequest) {
 
   const event = JSON.parse(body) as {
     type: string
-    data: { status?: string; metadata?: Record<string, string> }
+    data: {
+      status?: string
+      metadata?: Record<string, string>
+      // subscription 이벤트 구조
+      checkout_id?: string
+      checkout?: { metadata?: Record<string, string> }
+    }
   }
 
-  if (event.type === 'checkout.updated' && event.data.status === 'succeeded') {
-    const ownerId = event.data.metadata?.owner_id
-    if (ownerId) {
-      const supabase = createClient(
-        process.env.SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      )
-      await supabase.from('profiles').update({ plan: 'PRO' }).eq('id', ownerId)
-    }
+  console.log('[Polar webhook]', event.type, JSON.stringify(event.data).slice(0, 300))
+
+  // owner_id를 여러 위치에서 탐색
+  const ownerId =
+    event.data.metadata?.owner_id ??
+    event.data.checkout?.metadata?.owner_id ?? null
+
+  // PRO로 전환할 이벤트 목록
+  const proEvents = [
+    'checkout.updated',   // status === 'succeeded'
+    'subscription.created',
+    'subscription.active',
+    'order.paid',
+  ]
+
+  const shouldUpgrade =
+    proEvents.includes(event.type) &&
+    (event.type !== 'checkout.updated' || event.data.status === 'succeeded')
+
+  if (shouldUpgrade && ownerId) {
+    const supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { error } = await supabase.from('profiles').update({ plan: 'PRO' }).eq('id', ownerId)
+    if (error) console.error('[Polar webhook] DB update error', error)
+    else console.log('[Polar webhook] upgraded', ownerId, 'to PRO')
   }
 
   return NextResponse.json({ received: true })

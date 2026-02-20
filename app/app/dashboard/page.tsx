@@ -4,6 +4,7 @@ export const revalidate = 0
 import { createClient } from '@/lib/supabase/server'
 import { Suspense } from 'react'
 import UpgradeBanner from './upgrade-banner'
+import UpgradeButton from './upgrade-button'
 import Link from 'next/link'
 
 const FREE_LIMIT = 20
@@ -69,10 +70,7 @@ export default async function DashboardPage() {
             <p className="font-semibold text-indigo-800">PRO로 업그레이드</p>
             <p className="text-sm text-indigo-600 mt-0.5">월 SMS 300건 + 제한 해제 · ₩29,000/월</p>
           </div>
-          <Link href="/app/billing"
-            className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-            PRO 시작하기 →
-          </Link>
+          <UpgradeButton />
         </div>
       )}
       {plan === 'PRO' && (
