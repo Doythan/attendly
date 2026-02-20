@@ -10,6 +10,11 @@ const STATUS_COLOR: Record<MessageStatus, string> = {
   FAILED: 'bg-red-100 text-red-700',
 }
 
+type PreviewModal = {
+  message: Message
+  editContent: string
+}
+
 export default function OutboxPage() {
   const supabase = createClient()
   const [messages, setMessages] = useState<Message[]>([])
@@ -17,6 +22,8 @@ export default function OutboxPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState<{ type: 'single' | 'bulk'; ids: string[] } | null>(null)
+  const [previewModal, setPreviewModal] = useState<PreviewModal | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const fetchMessages = useCallback(async () => {
     const { data } = await supabase
@@ -61,6 +68,18 @@ export default function OutboxPage() {
 
   async function resetFailed(id: string) {
     await supabase.from('messages').update({ status: 'DRAFT', error: null }).eq('id', id)
+    fetchMessages()
+  }
+
+  async function saveEdit() {
+    if (!previewModal) return
+    setSaving(true)
+    await supabase
+      .from('messages')
+      .update({ content: previewModal.editContent })
+      .eq('id', previewModal.message.id)
+    setSaving(false)
+    setPreviewModal(null)
     fetchMessages()
   }
 
@@ -162,8 +181,14 @@ export default function OutboxPage() {
                     <div className="text-xs text-gray-400">{(m.student as { name?: string; parent_phone?: string } | null)?.parent_phone}</div>
                   </td>
                   <td className="px-4 py-3 max-w-xs">
-                    <p className="text-gray-700 truncate">{m.content}</p>
-                    {m.error && <p className="text-red-500 text-xs truncate">{m.error}</p>}
+                    <button
+                      onClick={() => setPreviewModal({ message: m, editContent: m.content })}
+                      className="text-left w-full group"
+                    >
+                      <p className="text-gray-700 truncate group-hover:text-indigo-600 transition-colors">{m.content}</p>
+                      <p className="text-xs text-gray-400 group-hover:text-indigo-400">클릭하여 전체보기{m.status === 'DRAFT' ? ' · 수정' : ''}</p>
+                    </button>
+                    {m.error && <p className="text-red-500 text-xs truncate mt-1">{m.error}</p>}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[m.status]}`}>
@@ -212,7 +237,82 @@ export default function OutboxPage() {
         </div>
       )}
 
-      {/* Confirm modal */}
+      {/* 내용 미리보기 / 수정 모달 */}
+      {previewModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b">
+              <div>
+                <h2 className="text-lg font-bold">메시지 내용</h2>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {(previewModal.message.student as { name?: string } | null)?.name} ·{' '}
+                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${STATUS_COLOR[previewModal.message.status]}`}>
+                    {previewModal.message.status}
+                  </span>
+                </p>
+              </div>
+              <button onClick={() => setPreviewModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-light">✕</button>
+            </div>
+
+            <div className="px-6 py-4">
+              {previewModal.message.status === 'DRAFT' ? (
+                <>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">내용 수정</label>
+                  <textarea
+                    value={previewModal.editContent}
+                    onChange={e => setPreviewModal({ ...previewModal, editContent: e.target.value })}
+                    rows={6}
+                    className="mt-2 w-full border rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  <p className="text-xs text-gray-400 mt-1 text-right">{previewModal.editContent.length}자</p>
+                </>
+              ) : (
+                <>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">내용</label>
+                  <div className="mt-2 w-full border rounded-xl px-4 py-3 text-sm text-gray-700 bg-gray-50 whitespace-pre-wrap leading-relaxed">
+                    {previewModal.message.content}
+                  </div>
+                </>
+              )}
+
+              {previewModal.message.error && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2">
+                  <p className="text-xs text-red-600">{previewModal.message.error}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end px-6 pb-6">
+              <button onClick={() => setPreviewModal(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+                닫기
+              </button>
+              {previewModal.message.status === 'DRAFT' && (
+                <>
+                  <button
+                    onClick={saveEdit}
+                    disabled={saving || previewModal.editContent === previewModal.message.content}
+                    className="px-5 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:opacity-40 font-medium"
+                  >
+                    {saving ? '저장 중...' : '저장'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPreviewModal(null)
+                      setConfirmModal({ type: 'single', ids: [previewModal.message.id] })
+                    }}
+                    disabled={!!sending}
+                    className="px-5 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+                  >
+                    전송
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SMS 전송 확인 모달 */}
       {confirmModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-xl">
