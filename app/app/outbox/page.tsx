@@ -15,7 +15,7 @@ export default function OutboxPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [sending, setSending] = useState<string | null>(null) // 'bulk' | messageId
+  const [sending, setSending] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState<{ type: 'single' | 'bulk'; ids: string[] } | null>(null)
 
   const fetchMessages = useCallback(async () => {
@@ -44,6 +44,24 @@ export default function OutboxPage() {
     } else {
       setSelected(new Set(drafts))
     }
+  }
+
+  async function deleteMessage(id: string) {
+    await supabase.from('messages').delete().eq('id', id)
+    setSelected(prev => { const next = new Set(prev); next.delete(id); return next })
+    fetchMessages()
+  }
+
+  async function deleteSelected() {
+    const ids = Array.from(selected)
+    await supabase.from('messages').delete().in('id', ids)
+    setSelected(new Set())
+    fetchMessages()
+  }
+
+  async function resetFailed(id: string) {
+    await supabase.from('messages').update({ status: 'DRAFT', error: null }).eq('id', id)
+    fetchMessages()
   }
 
   async function sendMessages(ids: string[]) {
@@ -80,6 +98,14 @@ export default function OutboxPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold">Outbox</h1>
         <div className="flex gap-2">
+          {selected.size > 0 && (
+            <button
+              onClick={deleteSelected}
+              className="border border-red-200 text-red-500 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50"
+            >
+              선택 삭제 ({selected.size}건)
+            </button>
+          )}
           {selectedDrafts.length > 0 && (
             <button
               onClick={() => setConfirmModal({ type: 'bulk', ids: selectedDrafts })}
@@ -123,7 +149,7 @@ export default function OutboxPage() {
               {messages.map(m => (
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    {m.status === 'DRAFT' && (
+                    {m.status !== 'SENT' && (
                       <input
                         type="checkbox"
                         checked={selected.has(m.id)}
@@ -147,16 +173,34 @@ export default function OutboxPage() {
                   <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                     {new Date(m.created_at).toLocaleString('ko-KR')}
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    {m.status === 'DRAFT' && (
-                      <button
-                        onClick={() => setConfirmModal({ type: 'single', ids: [m.id] })}
-                        disabled={!!sending}
-                        className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg hover:bg-indigo-100 disabled:opacity-50"
-                      >
-                        {sending === m.id ? '전송 중...' : '전송'}
-                      </button>
-                    )}
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1 justify-end">
+                      {m.status === 'DRAFT' && (
+                        <button
+                          onClick={() => setConfirmModal({ type: 'single', ids: [m.id] })}
+                          disabled={!!sending}
+                          className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg hover:bg-indigo-100 disabled:opacity-50"
+                        >
+                          {sending === m.id ? '전송 중...' : '전송'}
+                        </button>
+                      )}
+                      {m.status === 'FAILED' && (
+                        <button
+                          onClick={() => resetFailed(m.id)}
+                          className="text-xs bg-yellow-50 text-yellow-700 px-3 py-1 rounded-lg hover:bg-yellow-100"
+                        >
+                          재시도
+                        </button>
+                      )}
+                      {m.status !== 'SENT' && (
+                        <button
+                          onClick={() => deleteMessage(m.id)}
+                          className="text-xs bg-red-50 text-red-500 px-3 py-1 rounded-lg hover:bg-red-100"
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
