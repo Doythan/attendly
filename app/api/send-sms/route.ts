@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createHmac, randomUUID } from 'crypto'
 
 export const preferredRegion = 'iad1'
 
@@ -31,22 +32,12 @@ function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
-async function getSolapiAuthHeader(): Promise<string> {
+function getSolapiAuthHeader(): string {
   const apiKey = process.env.SOLAPI_API_KEY!
   const apiSecret = process.env.SOLAPI_API_SECRET!
   const date = new Date().toISOString()
-  const salt = crypto.randomUUID()
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(apiSecret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(date + salt))
-  const signature = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
-
+  const salt = randomUUID()
+  const signature = createHmac('sha256', apiSecret).update(date + salt).digest('hex')
   return `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`
 }
 
@@ -131,7 +122,7 @@ export async function POST(req: NextRequest) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: await getSolapiAuthHeader(),
+      Authorization: getSolapiAuthHeader(),
     },
     body: JSON.stringify({
       message: {
