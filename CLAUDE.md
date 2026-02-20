@@ -1,67 +1,162 @@
 # Attendly (해커톤 MVP)
 
-## 목표 (반드시 충족 / Pass 조건)
-해커톤 예선 통과를 위해 “실제로 작동하는 제품”을 만든다.
+## 목표
+해커톤 예선 통과를 위해 "실제로 작동하는 제품"을 만든다.
 
-1) 실제로 동작하는 웹서비스(배포 가능)
-2) OpenAI API로 SMS 문구를 생성한다
-3) Twilio로 한국 휴대폰(010)으로 실제 SMS를 발송한다
-4) 수익성: Polar 구독 결제(Checkout) + 결제 성공 시 Pro 플랜 해제(webhook)
-5) 발송 로그/상태(DRAFT/SENT/FAILED)가 DB에 저장되고 UI에서 확인된다
-6) Outbox에서 여러 메시지를 선택해서 “선택 전송(Bulk send)”이 가능해야 한다
+1. 실제로 동작하는 웹서비스 (Vercel 배포)
+2. OpenAI API로 미납 리마인드 / 전체 공지 문자를 생성
+3. Solapi로 한국 휴대폰(010)으로 실제 SMS 발송
+4. 수익성: Polar 구독 결제(Checkout) + 결제 성공 시 PRO 플랜 전환(webhook)
+5. 발송 로그/상태(DRAFT/SENT/FAILED)가 DB에 저장되고 UI에서 확인
+6. Outbox에서 여러 메시지를 선택해서 "선택 전송(Bulk send)" 가능
 
-## 이번 MVP에서 하지 않을 것(절대 하지 말기)
-- 카카오 알림톡/카톡 자동발송 연동
+## 이번 MVP에서 하지 않을 것
+- 카카오 알림톡 연동
 - 멀티테넌시(여러 학원/지점) / 복잡한 권한
-- 과한 디자인/애니메이션
 - 완벽한 아키텍처/테스트 커버리지
 
-## 고정 기술 스택(변경 금지)
-- Next.js 14(App Router) + TypeScript + Tailwind
-- Supabase: Auth + Postgres + RLS
-- Cloudflare Workers: 서버 API(OpenAI, Twilio, Polar webhook)
-- Cloudflare Pages: 프론트 배포
-- Polar: Checkout Subscription (한국 지원, 테스트 모드 OK)
-- Twilio: SMS 실발송
+---
 
-## MVP 페이지(최소 화면)
-- /                 : 랜딩 + Pricing(요금제) + 업그레이드 CTA
-- /login            : 로그인(이메일/비번)
-- /app/dashboard     : 오늘 결석/미납/발송 수 + 내 플랜 + 남은 무료 발송량
-- /app/students      : 학생 CRUD + 더미데이터 생성 버튼
-- /app/attendance    : 날짜/반 선택 → 출석/결석/지각 저장 + 안내문 생성(AI)
-- /app/billing       : 미납 학생 목록 + 미납 리마인드 생성(AI)
-- /app/outbox        : 메시지 목록(DRAFT/SENT/FAILED) + 미리보기 + 선택 전송(Bulk) + 단건 전송(확인 모달)
+## 기술 스택 (변경 금지)
 
-## 핵심 규칙(중요)
-- “끝까지 동작하는 흐름”을 먼저 만든다:
-  로그인 → 학생 등록 → 출결 저장 → 안내문 생성 → Outbox 저장 → SMS 전송 → 로그 확인
-- 비밀키(OpenAI/Twilio/Polar Access Token)는 Workers에서만 사용한다(클라이언트 금지)
-- 전화번호 정규화: 010xxxxxxxx → +8210xxxxxxxx
-- 전송 레이트리밋: 사용자당 분당 최대 5회
-- 무료 플랜 제한: 월 20건 SMS 발송 제한
-- Pro 플랜: 제한 해제(또는 월 300건)
+| 영역 | 기술 |
+|---|---|
+| **프론트** | Next.js 15 (App Router) + TypeScript + Tailwind CSS |
+| **DB / Auth** | Supabase (Postgres + RLS) |
+| **API Routes** | Next.js API Routes (`preferredRegion = 'iad1'`) |
+| **배포** | Vercel (https://attendly-mu.vercel.app) |
+| **SMS** | Solapi (한국 번호 지원, HMAC-SHA256 인증) |
+| **AI** | OpenAI gpt-4o-mini |
+| **결제** | Polar Subscription |
 
-## DB 모델(필수)
-- profiles: 유저 플랜/월 발송 카운트
-- students: 학생/학부모 전화/반/미납 여부
-- attendance_records: 날짜별 출결(PRESENT/ABSENT/LATE)
-- messages: Outbox(type, tone, content, status, provider id, error)
+---
 
-※ 모든 데이터는 owner_id = auth.uid() 조건으로 RLS 적용
+## 구현된 페이지
 
-## 완료 정의(Definition of Done)
-- 결석 처리 후 “AI 안내문 생성”을 누르면 Outbox에 메시지가 생긴다
-- Outbox에서 1건 전송 및 여러 건 선택 전송이 된다
-- 실제 폰으로 문자가 도착한다
-- 성공/실패가 UI에 표시되고 DB에 저장된다
-- Polar 결제(테스트 모드 OK) 성공 후 plan=PRO로 바뀌고 제한이 해제된다
-- README에 설치/배포/시연 체크리스트가 있다
+| 경로 | 기능 |
+|---|---|
+| `/` | 랜딩 + Pricing + 업그레이드 CTA |
+| `/login` | 이메일/비번 로그인·회원가입 |
+| `/app/dashboard` | 학원명 표시, 통계 카드(결석/미납/발송/남은 건수), 빠른 이동 |
+| `/app/students` | 학생 CRUD + 이름/반/미납 필터 + 페이징(10건) + 미납 토글 + 월수강료 입력 |
+| `/app/attendance` | 날짜별 출결(출석/결석/지각) + 고정 템플릿 선택(기본/친근/간결) → Outbox 저장 |
+| `/app/billing` | 미납 학생 목록 + 월수강료·미납개월 편집 + 자동 미수금 계산 + AI 리마인드 생성 |
+| `/app/notice` | 전체 공지 AI 생성(휴원/명절/새해/행사/개강/기타) → 전체 학생 Outbox 저장 |
+| `/app/outbox` | 메시지 목록 + 상태 필터(ALL/DRAFT/SENT/FAILED) + 페이징(15건) + 단건·선택 전송 + 삭제·재시도 |
+| `/app/settings` | 학원명 등록/수정 |
 
-## 시연(영상) 체크리스트(예선 제출용)
-1) 로그인
-2) 출결에서 학생 2~3명 결석 체크
-3) AI 안내문 생성 → Outbox에 여러 건 생성 확인
-4) 체크박스 선택 후 “선택 전송” → 실제 폰 문자 연속 도착 화면
-5) 대시보드에서 발송 수 증가 + 남은 무료 건수 감소
-6) Pricing에서 Polar 결제 → PRO 전환 확인(제한 해제)
+## 구현된 API Routes
+
+| 경로 | 기능 |
+|---|---|
+| `POST /api/generate-message` | ATTENDANCE·PAYMENT 타입 AI 메시지 생성 + Outbox 저장 |
+| `POST /api/generate-notice` | NOTICE 타입 AI 공지 생성 (미저장, 내용만 반환) |
+| `POST /api/send-sms` | 단건 SMS 발송 (Solapi) + 쿼터 차감 |
+| `POST /api/send-sms-bulk` | 다건 SMS 발송 (Solapi) |
+| `POST /api/polar/create-checkout` | Polar 결제 세션 생성 |
+| `POST /api/polar/webhook` | Polar webhook → PRO 플랜 전환 |
+
+---
+
+## DB 스키마
+
+```sql
+-- profiles: 유저 플랜/발송 카운트/학원명
+profiles (id, plan, academy_name, sms_sent_count, sms_sent_count_month)
+
+-- students: 학생 정보
+students (id, owner_id, name, parent_phone, class_name, memo,
+          is_unpaid, unpaid_months, monthly_fee)
+
+-- attendance_records: 날짜별 출결
+attendance_records (id, owner_id, student_id, date, status)
+-- status: PRESENT | ABSENT | LATE
+
+-- messages: Outbox
+messages (id, owner_id, student_id, type, tone, content, status,
+          provider_message_id, error)
+-- type: ATTENDANCE | PAYMENT | NOTICE
+-- status: DRAFT | SENT | FAILED
+```
+
+※ 모든 테이블 RLS: `owner_id = auth.uid()`
+
+---
+
+## 환경변수 (Vercel)
+
+```
+# Public
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# Server-only (API Routes)
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+OPENAI_API_KEY
+OPENAI_MODEL=gpt-4o-mini
+SOLAPI_API_KEY
+SOLAPI_API_SECRET
+SOLAPI_SENDER_NUMBER
+POLAR_ACCESS_TOKEN
+POLAR_PRODUCT_ID
+POLAR_WEBHOOK_SECRET
+APP_BASE_URL
+```
+
+---
+
+## 핵심 규칙
+
+- 비밀키는 API Routes에서만 사용 (클라이언트 금지)
+- 전화번호 정규화: 010xxxxxxxx → Solapi는 010xxxxxxxx 그대로 사용
+- 레이트리밋: 사용자당 분당 최대 5회
+- 무료 플랜: 월 20건 / PRO: 월 300건
+- 출결 문자: AI 미사용, 고정 템플릿 (비용 절감)
+- 미납 문자: AI 사용 (학원명 + 미납 개월 수 포함)
+- 공지 문자: AI 사용 (학원명 포함)
+
+---
+
+## 디자인 원칙
+
+- **색상 시스템**: indigo-600 (primary), gray-50/100 (bg), red/green/orange (상태)
+- **카드**: `bg-white border border-gray-200 rounded-xl`
+- **버튼 primary**: `bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition`
+- **버튼 secondary**: `border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition`
+- **인풋**: `border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`
+- **테이블 헤더**: `bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide`
+- **페이지 제목**: `text-2xl font-bold text-gray-900`
+- **페이지 레이아웃**: `space-y-6`
+
+---
+
+## 로컬 실행
+
+```bash
+npm install
+npm run dev   # localhost:3000
+```
+
+`.env.local`:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://yuzygpommgawbmdrzsxn.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
+SUPABASE_URL=https://yuzygpommgawbmdrzsxn.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+SOLAPI_API_KEY=...
+SOLAPI_API_SECRET=...
+SOLAPI_SENDER_NUMBER=010xxxxxxxx
+POLAR_ACCESS_TOKEN=...
+POLAR_PRODUCT_ID=...
+POLAR_WEBHOOK_SECRET=...
+APP_BASE_URL=http://localhost:3000
+```
+
+## 배포
+
+```bash
+VERCEL_TOKEN=xxx vercel deploy --prod --yes
+```

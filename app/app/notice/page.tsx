@@ -5,22 +5,23 @@ import { createClient } from '@/lib/supabase/client'
 import type { Student } from '@/lib/types'
 
 const NOTICE_TYPES = [
-  '휴원 안내',
-  '명절 인사',
-  '새해 인사',
-  '행사 안내',
-  '개강 안내',
-  '기타 공지',
+  { value: '휴원 안내', emoji: '🏫' },
+  { value: '명절 인사', emoji: '🎊' },
+  { value: '새해 인사', emoji: '🎆' },
+  { value: '행사 안내', emoji: '📋' },
+  { value: '개강 안내', emoji: '📚' },
+  { value: '기타 공지', emoji: '📢' },
 ]
 
 export default function NoticePage() {
   const supabase = createClient()
   const [students, setStudents] = useState<Student[]>([])
-  const [noticeType, setNoticeType] = useState(NOTICE_TYPES[0])
+  const [noticeType, setNoticeType] = useState(NOTICE_TYPES[0].value)
   const [additionalInfo, setAdditionalInfo] = useState('')
   const [tone, setTone] = useState<'FRIENDLY' | 'FORMAL'>('FRIENDLY')
   const [generating, setGenerating] = useState(false)
   const [preview, setPreview] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState('')
 
@@ -34,6 +35,7 @@ export default function NoticePage() {
     setGenerating(true)
     setPreview('')
     setSaveResult('')
+    setIsEditing(false)
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch('/api/generate-notice', {
       method: 'POST',
@@ -66,121 +68,142 @@ export default function NoticePage() {
     }))
     await supabase.from('messages').insert(inserts)
     setSaving(false)
-    setSaveResult(`${inserts.length}명 학부모 대상으로 Outbox에 저장되었습니다.`)
+    setSaveResult(`${inserts.length}명 학부모 대상으로 Outbox에 저장되었습니다. Outbox에서 전송하세요.`)
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold">전체 공지</h1>
-          <p className="text-sm text-gray-400 mt-0.5">AI가 공지 문자를 생성하고 전체 학부모에게 발송합니다.</p>
-        </div>
+    <div className="space-y-6">
+      {/* 헤더 */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">전체 공지</h1>
+        <p className="text-sm text-gray-400 mt-1">AI가 공지 문자를 생성하고 전체 학부모에게 발송합니다. ({students.length}명 등록됨)</p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 max-w-xl mb-4">
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">공지 유형</label>
-          <div className="flex flex-wrap gap-2">
-            {NOTICE_TYPES.map(t => (
-              <button
-                key={t}
-                onClick={() => setNoticeType(t)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
-                  noticeType === t
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 왼쪽: 설정 */}
+        <div className="space-y-5">
+          {/* 공지 유형 */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">공지 유형 선택</h2>
+            <div className="grid grid-cols-3 gap-2">
+              {NOTICE_TYPES.map(t => (
+                <button
+                  key={t.value}
+                  onClick={() => setNoticeType(t.value)}
+                  className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 transition text-sm font-medium ${
+                    noticeType === t.value
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-xl">{t.emoji}</span>
+                  <span>{t.value}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">추가 정보 (선택)</label>
-          <input
-            type="text"
-            value={additionalInfo}
-            onChange={e => setAdditionalInfo(e.target.value)}
-            placeholder="예: 2월 9~12일 설 연휴로 휴원, 2월 13일 정상 수업"
-            className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          />
-        </div>
-
-        <div className="mb-5">
-          <label className="block text-sm font-medium text-gray-700 mb-2">어조</label>
-          <div className="flex gap-2">
-            {[{ value: 'FRIENDLY', label: '친근하게' }, { value: 'FORMAL', label: '공식적으로' }].map(t => (
-              <button
-                key={t.value}
-                onClick={() => setTone(t.value as 'FRIENDLY' | 'FORMAL')}
-                className={`px-4 py-1.5 rounded-lg text-sm border transition ${
-                  tone === t.value
-                    ? 'bg-gray-800 text-white border-gray-800'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+          {/* 추가 정보 + 어조 */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">추가 정보 (선택)</label>
+              <textarea
+                value={additionalInfo}
+                onChange={e => setAdditionalInfo(e.target.value)}
+                rows={3}
+                placeholder={'예: 2월 9~12일 설 연휴 휴원\n2월 13일(목) 정상 수업 재개'}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none leading-relaxed"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">어조</label>
+              <div className="flex gap-2">
+                {[{ value: 'FRIENDLY', label: '친근하게' }, { value: 'FORMAL', label: '공식적으로' }].map(t => (
+                  <button
+                    key={t.value}
+                    onClick={() => setTone(t.value as 'FRIENDLY' | 'FORMAL')}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition ${
+                      tone === t.value
+                        ? 'border-gray-800 bg-gray-800 text-white'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+          >
+            {generating ? 'AI 생성 중...' : '✨ AI 공지 문자 생성'}
+          </button>
         </div>
 
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {generating ? 'AI 생성 중...' : 'AI 문자 생성'}
-        </button>
-      </div>
-
-      {/* 미리보기 */}
-      {preview && (
-        <div className="bg-white border rounded-xl p-6 max-w-xl">
-          <div className="flex items-center justify-between mb-3">
+        {/* 오른쪽: 미리보기 */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-700">생성된 문자 미리보기</h2>
-            <span className="text-xs text-gray-400">전체 {students.length}명 대상</span>
+            {preview && (
+              <button
+                onClick={() => setIsEditing(e => !e)}
+                className="text-xs text-indigo-500 hover:text-indigo-700 border border-indigo-200 px-3 py-1 rounded-lg transition"
+              >
+                {isEditing ? '미리보기' : '직접 수정'}
+              </button>
+            )}
           </div>
-          <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed mb-4 border">
-            {preview}
-          </div>
-          <textarea
-            value={preview}
-            onChange={e => setPreview(e.target.value)}
-            rows={4}
-            className="hidden"
-          />
-          <div className="flex items-center gap-3">
-            <p className="text-xs text-gray-400">직접 수정하려면 위 텍스트를 클릭하세요.</p>
-          </div>
-          <div className="flex items-center gap-3 mt-3">
-            <button
-              onClick={handleSaveToOutbox}
-              disabled={saving || students.length === 0}
-              className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-            >
-              {saving ? '저장 중...' : `전체 ${students.length}명 Outbox에 저장`}
-            </button>
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="border px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-            >
-              다시 생성
-            </button>
-          </div>
-          {saveResult && <p className="text-sm text-green-600 font-medium mt-3">{saveResult}</p>}
-        </div>
-      )}
 
-      {preview && (
-        <div className="mt-3 text-xs text-gray-400 max-w-xl">
-          저장 후 Outbox에서 전체 선택 → 선택 전송으로 일괄 발송하세요.
+          {preview ? (
+            <>
+              {isEditing ? (
+                <textarea
+                  value={preview}
+                  onChange={e => setPreview(e.target.value)}
+                  rows={8}
+                  className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 leading-relaxed"
+                />
+              ) : (
+                <div className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-5 py-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed min-h-[12rem]">
+                  {preview}
+                </div>
+              )}
+              <p className="text-xs text-gray-400 text-right mt-1">{preview.length}자</p>
+
+              <div className="mt-4 space-y-3">
+                <button
+                  onClick={handleSaveToOutbox}
+                  disabled={saving || students.length === 0}
+                  className="w-full bg-green-600 text-white py-3 rounded-xl text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
+                >
+                  {saving ? '저장 중...' : `전체 ${students.length}명 Outbox에 저장 →`}
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="w-full border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  다시 생성
+                </button>
+              </div>
+              {saveResult && (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                  <p className="text-sm text-green-700 font-medium">{saveResult}</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-12 text-gray-300">
+              <span className="text-5xl mb-3">✉️</span>
+              <p className="text-sm">공지 유형을 선택하고<br/>AI 문자를 생성해보세요</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -1,18 +1,33 @@
-# Attendly — 학원 출결 SMS 자동화 (해커톤 MVP)
+# Attendly — 학원 출결·SMS 자동화
 
-> 로그인 → 학생 등록 → 출결 저장 → AI 안내문 생성 → Outbox → Twilio SMS 실발송
+> 로그인 → 학생 등록 → 출결 저장 → 안내문 생성 → Outbox → Solapi SMS 실발송
+
+**배포 URL**: https://attendly-mu.vercel.app
+
+---
 
 ## 기술 스택
 
-| 역할 | 기술 |
-|------|------|
-| 프론트 | Next.js 14 (App Router) + TypeScript + Tailwind |
+| 영역 | 기술 |
+|---|---|
+| 프론트 | Next.js 15 (App Router) + TypeScript + Tailwind CSS |
 | DB / Auth | Supabase (Postgres + RLS) |
-| API | Cloudflare Workers |
-| 배포 | Cloudflare Pages (프론트) |
-| SMS | Twilio |
-| AI | OpenAI (gpt-4o-mini) |
-| 결제 | Polar Subscription (한국 지원) |
+| API | Next.js API Routes (Vercel, `preferredRegion = 'iad1'`) |
+| SMS | Solapi (한국 010 번호 지원) |
+| AI | OpenAI gpt-4o-mini |
+| 결제 | Polar Subscription |
+| 배포 | Vercel |
+
+---
+
+## 주요 기능
+
+- **출결 관리**: 날짜별 출석/결석/지각 기록, 고정 템플릿(기본/친근/간결)으로 안내문 Outbox 저장
+- **미납 관리**: 미납 학생 목록, 월 수강료 × 미납 개월 수 자동 계산, AI 미납 리마인드 생성
+- **전체 공지**: 휴원/명절/새해/행사 등 유형 선택 → AI 공지 문자 생성 → 전체 학부모 Outbox 저장
+- **Outbox**: DRAFT/SENT/FAILED 필터, 페이징, 단건·선택 전송, 내용 수정·삭제·재시도
+- **설정**: 학원명 등록 (문자 발송 시 자동 포함)
+- **결제**: Polar PRO 플랜 구독 (월 SMS 300건)
 
 ---
 
@@ -21,124 +36,99 @@
 ### 1. 환경 변수 설정
 
 ```bash
-cp .env.example .env.local
-# .env.local 에 Supabase URL/Key, Workers URL 입력
+cp .env.local.example .env.local
+# 아래 값들 입력
 ```
 
-### 2. Next.js 개발 서버
-
-```bash
-npm install
-npm run dev        # http://localhost:3000
+`.env.local`:
 ```
+NEXT_PUBLIC_SUPABASE_URL=https://yuzygpommgawbmdrzsxn.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 
-### 3. Workers 로컬 개발
+SUPABASE_URL=https://yuzygpommgawbmdrzsxn.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
 
-```bash
-cd workers
-npm install
-# workers/.dev.vars 파일에 비밀키 입력
-npm run dev        # http://localhost:8787
-```
-
-`.dev.vars` 형식 (workers/ 폴더에 생성, git에 커밋 금지):
-
-```
-SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
-TWILIO_ACCOUNT_SID=AC...
-TWILIO_AUTH_TOKEN=...
-TWILIO_FROM_NUMBER=+1...
+
+SOLAPI_API_KEY=...
+SOLAPI_API_SECRET=...
+SOLAPI_SENDER_NUMBER=010xxxxxxxx
+
 POLAR_ACCESS_TOKEN=polar_sk_...
-POLAR_PRODUCT_ID=<product UUID from Polar dashboard>
-POLAR_WEBHOOK_SECRET=<base64-encoded secret from Polar dashboard>
+POLAR_PRODUCT_ID=<UUID>
+POLAR_WEBHOOK_SECRET=<base64-encoded>
 APP_BASE_URL=http://localhost:3000
 ```
 
-로컬 `.env.local`:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
-NEXT_PUBLIC_WORKERS_URL=http://localhost:8787
-APP_BASE_URL=http://localhost:3000
+### 2. 실행
+
+```bash
+npm install
+npm run dev   # http://localhost:3000
 ```
 
 ---
 
 ## Supabase 세팅
 
-1. [supabase.com](https://supabase.com) 에서 프로젝트 생성
-2. SQL Editor → **New query** → `supabase/schema.sql` 전체 붙여넣기 → Run
-3. Project Settings → API에서 URL / Publishable key / Secret key 복사
+1. [supabase.com](https://supabase.com) 프로젝트 생성
+2. SQL Editor → `supabase/schema.sql` 전체 실행
+3. 추가 마이그레이션 실행:
+
+```sql
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS academy_name text NOT NULL DEFAULT '';
+ALTER TABLE students ADD COLUMN IF NOT EXISTS unpaid_months integer NOT NULL DEFAULT 0;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS monthly_fee integer NOT NULL DEFAULT 0;
+ALTER TYPE message_type ADD VALUE IF NOT EXISTS 'NOTICE';
+```
+
+4. Authentication → Email Confirm: **OFF** 설정
 
 ---
 
-## Twilio 세팅
+## Solapi 세팅
 
-1. [twilio.com](https://twilio.com) 콘솔에서 Account SID / Auth Token 확인
-2. **Phone Numbers** → 번호 구매 (Trial 크레딧 사용)
-3. Trial 계정은 **Verified Caller IDs**에 수신 번호 등록 필요
+1. [solapi.com](https://solapi.com) 가입 → API Key 발급
+2. 발신 번호 등록 (본인 인증 필요)
+3. `SOLAPI_API_KEY`, `SOLAPI_API_SECRET`, `SOLAPI_SENDER_NUMBER` 설정
 
 ---
 
 ## Polar 세팅 (결제)
 
-1. [polar.sh](https://polar.sh) 접속 → 회원가입 (GitHub 연동 가능, 한국 지원)
-2. **Products** → **+ New Product** → 구독 상품 생성
-   - Name: `Attendly PRO`
-   - Price: ₩29,000 / month (또는 테스트용 $1)
-   - 상품 저장 후 **Product ID** (UUID) 복사 → `POLAR_PRODUCT_ID`
-3. **Settings** → **Developers** → **API Keys** → **New API Key** → `POLAR_ACCESS_TOKEN`
-4. **Settings** → **Webhooks** → **+ Add Endpoint**
-   - URL: `https://your-worker.workers.dev/api/polar/webhook`
+1. [polar.sh](https://polar.sh) 가입
+2. Products → + New Product → 구독 상품 생성 → `POLAR_PRODUCT_ID`
+3. Settings → Developers → API Keys → `POLAR_ACCESS_TOKEN`
+4. Settings → Webhooks → Add Endpoint
+   - URL: `https://attendly-mu.vercel.app/api/polar/webhook`
    - Events: `checkout.updated`
-   - **Webhook Secret** 복사 → `POLAR_WEBHOOK_SECRET`
-   - ⚠️ secret은 base64-encoded 형식 그대로 사용
+   - Webhook Secret → `POLAR_WEBHOOK_SECRET`
 
 ---
 
-## Cloudflare 배포
-
-### Workers
+## Vercel 배포
 
 ```bash
-cd workers
-npx wrangler secret put SUPABASE_URL
-npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-npx wrangler secret put OPENAI_API_KEY
-npx wrangler secret put TWILIO_ACCOUNT_SID
-npx wrangler secret put TWILIO_AUTH_TOKEN
-npx wrangler secret put TWILIO_FROM_NUMBER
-npx wrangler secret put POLAR_ACCESS_TOKEN
-npx wrangler secret put POLAR_PRODUCT_ID
-npx wrangler secret put POLAR_WEBHOOK_SECRET
-npx wrangler secret put APP_BASE_URL
-npm run deploy
+# Vercel CLI 설치 (이미 있으면 skip)
+npm i -g vercel
+
+# 프로덕션 배포
+VERCEL_TOKEN=xxx vercel deploy --prod --yes
 ```
 
-### Pages (프론트)
-
-```bash
-NEXT_PUBLIC_WORKERS_URL=https://your-worker.workers.dev \
-NEXT_PUBLIC_SUPABASE_URL=... \
-NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
-npm run build
-# out/ 폴더를 Cloudflare Pages에 업로드
-```
+Vercel 대시보드에서 환경변수 등록 후 배포 필요.
 
 ---
 
 ## 시연 체크리스트 (예선 제출용)
 
-- [ ] 1. `/login` 에서 이메일/비번으로 로그인
-- [ ] 2. `/app/students` → **더미 데이터 생성 (15명)** 버튼 클릭
-- [ ] 3. `/app/attendance` → 오늘 날짜로 학생 2~3명 **결석** 체크 → **출결 저장**
-- [ ] 4. **AI 안내문 생성 → Outbox 저장** 클릭
-- [ ] 5. `/app/outbox` → 메시지 확인, 체크박스 선택 → **선택 전송** → 확인 모달 → 전송
-- [ ] 6. 실제 폰에서 문자 도착 확인
-- [ ] 7. Outbox에서 상태 **SENT** 표시 확인
-- [ ] 8. `/app/dashboard` → 발송 수 증가 / 남은 건수 감소 확인
-- [ ] 9. `/app/billing` → **Polar로 결제 →** 클릭 → 결제 완료
-- [ ] 10. 대시보드 복귀 → **PRO 전환 배너** + 플랜 PRO 표시 확인
+- [ ] 1. `/login` 이메일/비번 로그인
+- [ ] 2. `/app/settings` 학원명 등록
+- [ ] 3. `/app/students` 더미 데이터 생성 (15명)
+- [ ] 4. `/app/attendance` 학생 2~3명 결석 체크 → 출결 저장 → 템플릿 선택 → Outbox 저장
+- [ ] 5. `/app/outbox` 메시지 확인 → 선택 전송 → 실제 폰 문자 도착 확인
+- [ ] 6. `/app/billing` 미납 개월 수 설정 → AI 리마인드 생성 → Outbox 저장 → 전송
+- [ ] 7. `/app/notice` 명절 인사 선택 → AI 생성 → Outbox 저장 → 전체 전송
+- [ ] 8. `/app/dashboard` 발송 수 증가 / 남은 건수 감소 확인
+- [ ] 9. `/app/billing` Polar 결제 → PRO 전환 확인

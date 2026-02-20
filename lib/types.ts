@@ -23,6 +23,7 @@ export interface Student {
   memo: string
   is_unpaid: boolean
   unpaid_months: number
+  monthly_fee: number
   created_at: string
   updated_at: string
 }
