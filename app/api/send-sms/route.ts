@@ -86,6 +86,7 @@ async function consumeSmsQuota(
 }
 
 export async function POST(req: NextRequest) {
+  try {
   const ownerId = await verifyToken(req.headers.get('Authorization'))
   if (!ownerId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -151,4 +152,8 @@ export async function POST(req: NextRequest) {
     .eq('id', messageId)
 
   return NextResponse.json({ messageId: solapiData.messageId })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: 'Internal error', detail: msg }, { status: 500 })
+  }
 }
