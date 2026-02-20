@@ -18,7 +18,11 @@ export default function LoginPage() {
     setError('')
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // 카카오: 비즈 앱 없이 이메일 scope 제외
+        ...(provider === 'kakao' && { scopes: 'profile_nickname profile_image' }),
+      },
     })
     if (authError) {
       setError(authError.message)
