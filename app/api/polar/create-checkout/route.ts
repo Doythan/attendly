@@ -20,7 +20,8 @@ export async function POST(req: NextRequest) {
   const ownerId = await verifyToken(req.headers.get('Authorization'))
   if (!ownerId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const polarRes = await fetch('https://api.polar.sh/v1/checkouts/', {
+  const polarApiBase = (process.env.POLAR_API_URL ?? 'https://api.polar.sh').trim()
+  const polarRes = await fetch(`${polarApiBase}/v1/checkouts/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
