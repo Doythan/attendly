@@ -1,4 +1,5 @@
 export const runtime = 'edge'
+export const revalidate = 0
 
 import { createClient } from '@/lib/supabase/server'
 import { Suspense } from 'react'
@@ -61,19 +62,36 @@ export default async function DashboardPage() {
         <StatCard label="남은 발송량" value={remaining} sub={`/ ${limit}건`} color={remaining < 5 ? 'red' : 'green'} />
       </div>
 
+      {/* 플랜 + 빠른 이동 */}
+      {plan === 'FREE' && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-5 flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-indigo-800">PRO로 업그레이드</p>
+            <p className="text-sm text-indigo-600 mt-0.5">월 SMS 300건 + 제한 해제 · ₩29,000/월</p>
+          </div>
+          <Link href="/app/billing"
+            className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+            PRO 시작하기 →
+          </Link>
+        </div>
+      )}
+      {plan === 'PRO' && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+          <span className="text-xl font-bold text-indigo-600">PRO</span>
+          <p className="text-green-700 font-medium">PRO 플랜 활성화됨 — SMS 300건/월 사용 가능</p>
+        </div>
+      )}
+
       {/* 하단 정보 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">현재 플랜</p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className={`text-xl font-bold ${plan === 'PRO' ? 'text-indigo-600' : 'text-gray-700'}`}>
               {plan}
             </span>
-            {plan === 'FREE' && (
-              <Link href="/app/billing"
-                className="text-sm text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg hover:bg-indigo-100 transition font-medium">
-                PRO 업그레이드 →
-              </Link>
+            {plan === 'PRO' && (
+              <span className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-lg font-medium">활성화됨 ✓</span>
             )}
           </div>
         </div>
