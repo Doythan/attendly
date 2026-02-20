@@ -56,11 +56,11 @@ export default function OutboxPage() {
   }
 
   function toggleAll() {
-    const drafts = messages.filter(m => m.status === 'DRAFT').map(m => m.id)
-    if (selected.size === drafts.length) {
+    const all = messages.map(m => m.id)
+    if (selected.size === all.length) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(drafts))
+      setSelected(new Set(all))
     }
   }
 
@@ -166,7 +166,7 @@ export default function OutboxPage() {
                 <th className="px-4 py-3 text-left w-8">
                   <input
                     type="checkbox"
-                    checked={draftIds.length > 0 && selected.size === draftIds.length}
+                    checked={messages.length > 0 && selected.size === messages.length}
                     onChange={toggleAll}
                   />
                 </th>
@@ -181,9 +181,7 @@ export default function OutboxPage() {
               {messages.map(m => (
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    {m.status !== 'SENT' && (
-                      <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggleSelect(m.id)} />
-                    )}
+                    <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggleSelect(m.id)} />
                   </td>
                   <td className="px-4 py-3 font-medium">
                     {(m.student as { name?: string; parent_phone?: string } | null)?.name ?? '알 수 없음'}
@@ -222,11 +220,9 @@ export default function OutboxPage() {
                           재시도
                         </button>
                       )}
-                      {m.status !== 'SENT' && (
-                        <button onClick={() => deleteMessage(m.id)} className="text-xs bg-red-50 text-red-500 px-3 py-1 rounded-lg hover:bg-red-100">
-                          삭제
-                        </button>
-                      )}
+                      <button onClick={() => deleteMessage(m.id)} className="text-xs bg-red-50 text-red-500 px-3 py-1 rounded-lg hover:bg-red-100">
+                        삭제
+                      </button>
                     </div>
                   </td>
                 </tr>
